@@ -1,5 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+const sqlite3 = require('sqlite3').verbose();
+const dbSource = "node.db";
+const db = new sqlite3.Database(dbSource);
 
 const HTTP_PORT = 8000;
 console.log("Listening on port " + HTTP_PORT);
@@ -32,22 +35,41 @@ app.get("/", (req,res,next) => {
 app.post("/fruit", (req,res,next) => {
     let strName = req.query.name;
     let strColor = req.query.color;
+    let strCommand = "INSERT INTO tblFruit VALUES(?, ?)";
 
-    arrFruit.push(new Fruit(strName, strColor));
-    res.status(201).send(arrFruit);
+    if(strName && strColor){
+        let arrParameters = [strName, strColor];
+        let objFruit = new Fruit(strName, strColor);
+        db.run(strCommand, arrParameters, function(err, result){
+            if(err){
+                res.status(400).json({error:err.message});
+            }else{
+                res.status(201).json({message:"success",fruit:objFruit});
+            }
+        })
+    }else{
+        res.status(400).json({error:"Not all parameters provided"});
+    }
 })
 
 app.get("/fruit", (req,res,next) => {
     let strName = req.query.name;
     if(strName){
-        arrFruit.forEach(function(fruit){
-            if(fruit.name == strName){
-                res.status(200).send(fruit);
+        let strCommand = "SELECT * FROM tblFruit WHERE name = ?";
+        let arrParameters = [strName];
+        db.all(strCommand, arrParameters, (err, row) => {
+            if(err){
+                res.status(400).json({error:err.message});
+            }else{
+                if(row.length < 1){
+                    res.status(200).json({message:"error: not found"});
+                }else{
+                    res.status(200).json({message:"success", fruit:row})
+                }
             }
         })
-        res.status(200).send({message:"Fruit Not Found"});
     }else{
-        res.status(200).send(arrFruit);
+        res.status(400).json({error:"No fruit name provided"});
     }
 })
 
@@ -68,11 +90,15 @@ app.delete("/fruit", (req,res,next) => {
 })
 
 app.get("/hello", (req,res,next) => {
-    let strFruit = req.query.fruit;
-    console.log("Routed to hello route");
-    console.log(strFruit);
+    let strCommand = 'Select * from tblFruit';
 
-    res.status(200).send("Hello " + strFruit);
+    db.all(strCommand, (err, row) => {
+            if(err){
+                req.status(400).json({error:err.message});
+            }else{
+                res.status(200).json({message:"success", fruit:row})
+            }
+    })
 })
 
 app.listen(HTTP_PORT);
