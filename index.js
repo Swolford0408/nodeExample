@@ -3,6 +3,7 @@ const cors = require('cors');
 const {v4:uuidv4} = require('uuid');
 const sqlite3 = require('sqlite3').verbose();
 const dbSource = "node.db";
+const bcrypt = require('bcrypt');
 const db = new sqlite3.Database(dbSource);
 
 const HTTP_PORT = 8000;
@@ -31,6 +32,51 @@ arrFruit.push(new Fruit('kiwi', 'brown'));
 
 app.get("/", (req,res,next) => {
     res.status(200).send(arrFruit);
+})
+
+app.post("/users", (req,res,next) => {
+    let strUserID = req.query.userID;
+    let strPassword = req.query.password;
+    let strSessionID = uuidv4();
+
+    if(strUserID && strPassword){
+        bcrypt.hash(strPassword, 10).then(hash => {
+            strPassword = hash;
+            let strCommand = "SELECT * FROM tblUsers WHERE userID = ? AND password = ?";
+            let arrParameters = [strUserID, strPassword];
+            db.all(strCommand,arrParameters,function(err,result){
+                if(result.length > 0){
+                    strCommand = "INSERT INTO tblSessions VALUES(?,SELECT userID from tblUsers WHERE userID = ? AND password = ?)";
+                    arrParameters = [strSessionID, strUserID];
+                    db.run(strCommand, arrParameters, function(err,res){
+                        if(err){
+                            res.status(400).json({error:err.message});
+                        }else{
+                            res.status(201).json({message:"success",sessionID:strSessionID});
+                        }
+                    })
+                }
+            })
+        })
+    }
+    
+    /*    
+    let strCommand = "INSERT INTO tblFruit VALUES(?, ?)";
+
+    if(strName && strColor){
+        let arrParameters = [strName, strColor];
+        let objFruit = new Fruit(strName, strColor);
+        db.run(strCommand, arrParameters, function(err, result){
+            if(err){
+                res.status(400).json({error:err.message});
+            }else{
+                res.status(201).json({message:"success",fruit:objFruit});
+            }
+        })
+    }else{
+        res.status(400).json({error:"Not all parameters provided"});
+    }
+    */
 })
 
 app.post("/fruit", (req,res,next) => {
